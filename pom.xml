@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.example</groupId>
+    <artifactId>seckill</artifactId>
+    <!-- 父模块打包类型必须为pom -->
+    <packaging>pom</packaging>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.5.5</version>
+        <relativePath/>
+    </parent>
+
+    <version>1.0-SNAPSHOT</version>
+    <modules>
+        <module>seckill_common</module>
+        <module>seckill_business</module>
+        <module>seckill_admin</module>
+    </modules>
+
+    <name>seckill</name>
+    <description>seckill</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+    </dependencies>
+
+    <!-- 版本说明：这里统一管理依赖的版本号 -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.example</groupId>
+                <artifactId>seckill_admin</artifactId>
+                <version>1.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>org.example</groupId>
+                <artifactId>seckill_common</artifactId>
+                <version>1.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>org.example</groupId>
+                <artifactId>seckill_business</artifactId>
+                <version>1.0-SNAPSHOT</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <properties>
+        <java.version>1.8</java.version>
+        <httpclientVersion>4.5.5</httpclientVersion>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+    </properties>
+
+</project>
