@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Bean;
 
 public class RabbitMqConfig {
     public CachingConnectionFactory connectionFactory(){
-        CachingConnectionFactory connectionFactory = new CachingConnectionFactory("", 5672);
+        CachingConnectionFactory connectionFactory = new CachingConnectionFactory("192.168.146.130", 5672);
         //构造方法已传入
 //        connectionFactory.setHost();
 //        connectionFactory.setPort();
