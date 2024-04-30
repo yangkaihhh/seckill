@@ -1,47 +1,77 @@
 package com.kill.config;
 
 
-import org.springframework.amqp.core.AcknowledgeMode;
-import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
-import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
+import com.kill.CallBack;
+import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.retry.MessageRecoverer;
+import org.springframework.amqp.rabbit.retry.RepublishMessageRecoverer;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Scope;
 
-
+@Configuration
 public class RabbitMqConfig {
-    public CachingConnectionFactory connectionFactory(){
-        CachingConnectionFactory connectionFactory = new CachingConnectionFactory("192.168.146.130", 5672);
-        //构造方法已传入
-//        connectionFactory.setHost();
-//        connectionFactory.setPort();
-        connectionFactory.setUsername("user");
-        connectionFactory.setUsername("aaaaaa");
-        connectionFactory.setVirtualHost("testHost");
+    public static final String QUEUE_INFORM_EMAIL = "queue_inform_email";
+    public static final String QUEUE_INFORM_LAZY = "queue_inform_lazy";
+    public static final String EXCHANGE_TOPICS_INFORM = "exchange_topics_inform";
+    public static final String ROUTINGKEY_EMAIL = "inform.#.email.#";
+    public static final String ROUTINGKEY_LAZY = "inform.#.lazy.#";
 
-        //是否开启消息确认机制
-//        spring.rabbitmq.publisher-confirm在springboot2.2.0.RELEASE版本之前是amqp正式支持的属性，用来配置消息发送到交换器之后是否触发回调方法，在2.2.0及之后使用spring.rabbitmq.publisher-confirm-type属性配置代替，用来配置更多的确认类型；
-//
-//        其中：
-//
-//        NONE值是禁用发布确认模式，是默认值
-//                CORRELATED值是发布消息成功到交换器后会触发回调方法
-//        SIMPLE值经测试有两种效果，其一效果和CORRELATED值一样会触发回调方法，其二在发布消息成功后使用rabbitTemplate调用waitForConfirms或waitForConfirmsOrDie方法等待broker节点返回发送结果，根据返回结果来判定下一步的逻辑，要注意的点是waitForConfirmsOrDie方法如果返回false则会关闭channel，则接下来无法发送消息到broker;
-        connectionFactory.setPublisherConfirmType(CachingConnectionFactory.ConfirmType.CORRELATED);
-
-        return connectionFactory;
+    //声明交换机
+    @Bean(EXCHANGE_TOPICS_INFORM)
+    public Exchange EXCHANGE_TOPICS_INFORM() {
+        //durable(true) 持久化，mq重启之后交换机还在
+        return ExchangeBuilder.topicExchange(EXCHANGE_TOPICS_INFORM).durable(true).build();
     }
 
-    public SimpleRabbitListenerContainerFactory simpleRabbitListenerContainerFactory(){
-        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
-        factory.setConnectionFactory(connectionFactory());
-        //设置手动确认消息消费
-        factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
-        return factory;
+    //声明QUEUE_INFORM_EMAIL队列
+    @Bean(QUEUE_INFORM_EMAIL)
+    public Queue QUEUE_INFORM_EMAIL() {
+        return new Queue(QUEUE_INFORM_EMAIL);
     }
 
-
-    public RabbitTemplate rabbitTemplate(CachingConnectionFactory  factory){
-        RabbitTemplate template = new RabbitTemplate(factory);
-        return template;
+    //声明QUEUE_INFORM_LAZY队列
+    @Bean(QUEUE_INFORM_LAZY)
+    public Queue QUEUE_INFORM_SMS() {
+        return QueueBuilder.durable(QUEUE_INFORM_LAZY)
+                .lazy()
+                .build();
     }
+
+    //ROUTINGKEY_EMAIL队列绑定交换机，指定routingKey
+    @Bean
+    public Binding BINDING_QUEUE_INFORM_EMAIL(@Qualifier(QUEUE_INFORM_EMAIL) Queue queue,
+                                              @Qualifier(EXCHANGE_TOPICS_INFORM) Exchange exchange) {
+        return BindingBuilder.bind(queue).to(exchange).with(ROUTINGKEY_EMAIL).noargs();
+    }
+
+    //ROUTINGKEY_LAZY队列绑定交换机，指定routingKey
+    @Bean
+    public Binding BINDING_ROUTINGKEY_SMS(@Qualifier(QUEUE_INFORM_LAZY) Queue queue,
+                                          @Qualifier(EXCHANGE_TOPICS_INFORM) Exchange exchange) {
+        return BindingBuilder.bind(queue).to(exchange).with(ROUTINGKEY_LAZY).noargs();
+
+    }
+
+    /**********************************消费者消费失败后发送到队列*************************************************/
+    @Bean
+    public DirectExchange errorMessageExchange(){
+        return new DirectExchange("error.direct");
+    }
+    @Bean
+    public Queue errorQueue(){
+        return new Queue("error.queue", true);
+    }
+    @Bean
+    public Binding errorBinding(Queue errorQueue, DirectExchange errorMessageExchange){
+        return BindingBuilder.bind(errorQueue).to(errorMessageExchange).with("error");
+    }
+
+    @Bean
+    public MessageRecoverer republishMessageRecoverer(RabbitTemplate rabbitTemplate){
+        return new RepublishMessageRecoverer(rabbitTemplate, "error.direct", "error");
+    }
+
 }
