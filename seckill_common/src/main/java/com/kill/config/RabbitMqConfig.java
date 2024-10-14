@@ -9,69 +9,80 @@ import org.springframework.amqp.rabbit.retry.RepublishMessageRecoverer;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Scope;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Configuration
 public class RabbitMqConfig {
-    public static final String QUEUE_INFORM_EMAIL = "queue_inform_email";
-    public static final String QUEUE_INFORM_LAZY = "queue_inform_lazy";
-    public static final String EXCHANGE_TOPICS_INFORM = "exchange_topics_inform";
-    public static final String ROUTINGKEY_EMAIL = "inform.#.email.#";
-    public static final String ROUTINGKEY_LAZY = "inform.#.lazy.#";
 
-    //声明交换机
-    @Bean(EXCHANGE_TOPICS_INFORM)
-    public Exchange EXCHANGE_TOPICS_INFORM() {
-        //durable(true) 持久化，mq重启之后交换机还在
-        return ExchangeBuilder.topicExchange(EXCHANGE_TOPICS_INFORM).durable(true).build();
+    private static final String DLX_EXCHANGE = "yk.dlx.exchange";
+    private static final String DLX_QUEUE_A = "yk.dlx.queue.a";
+    private static final String DLX_ROUTING_KEY_A = "yk.dlx.key.a";
+
+    private static final String YK_QUEUE = "yk.queue";
+    private static final String YK_EXCHANGE = "yk.exchange";
+    private static final String YK_ROUTING_KEY = "yk.key";
+
+    // 声明业务Exchange
+    @Bean("businessExchange")
+    public TopicExchange businessExchange(){
+        return new TopicExchange(YK_EXCHANGE);
     }
 
-    //声明QUEUE_INFORM_EMAIL队列
-    @Bean(QUEUE_INFORM_EMAIL)
-    public Queue QUEUE_INFORM_EMAIL() {
-        return new Queue(QUEUE_INFORM_EMAIL);
+    // 声明死信Exchange
+    @Bean("deadLetterExchange")
+    public DirectExchange deadLetterExchange(){
+        return new DirectExchange(DLX_EXCHANGE);
+    }
+    // 声明业务队列A
+    @Bean("businessQueueA")
+    public Queue businessQueueA(){
+        Map<String, Object> args = new HashMap<>(2);
+        //       x-dead-letter-exchange    这里声明当前队列绑定的死信交换机
+        args.put("x-dead-letter-exchange", DLX_EXCHANGE);
+        //       x-dead-letter-routing-key  这里声明当前队列的死信路由key
+        args.put("x-dead-letter-routing-key", DLX_ROUTING_KEY_A);
+        return QueueBuilder.durable(YK_QUEUE).withArguments(args).build();
     }
 
-    //声明QUEUE_INFORM_LAZY队列
-    @Bean(QUEUE_INFORM_LAZY)
-    public Queue QUEUE_INFORM_SMS() {
-        return QueueBuilder.durable(QUEUE_INFORM_LAZY)
-                .lazy()
-                .build();
+    // 声明死信队列A
+    @Bean("deadLetterQueueA")
+    public Queue deadLetterQueueA(){
+        return new Queue(DLX_QUEUE_A , true ,true ,false);
     }
 
-    //ROUTINGKEY_EMAIL队列绑定交换机，指定routingKey
+    // 声明业务队列A绑定关系
     @Bean
-    public Binding BINDING_QUEUE_INFORM_EMAIL(@Qualifier(QUEUE_INFORM_EMAIL) Queue queue,
-                                              @Qualifier(EXCHANGE_TOPICS_INFORM) Exchange exchange) {
-        return BindingBuilder.bind(queue).to(exchange).with(ROUTINGKEY_EMAIL).noargs();
+    public Binding businessBindingA(@Qualifier("businessQueueA") Queue queue,
+                                    @Qualifier("businessExchange") TopicExchange exchange){
+        return BindingBuilder.bind(queue).to(exchange).with(YK_ROUTING_KEY);
     }
 
-    //ROUTINGKEY_LAZY队列绑定交换机，指定routingKey
+
+    // 声明死信队列A绑定关系  死信队列绑定死信交换机 死信队列绑定死信路由key
     @Bean
-    public Binding BINDING_ROUTINGKEY_SMS(@Qualifier(QUEUE_INFORM_LAZY) Queue queue,
-                                          @Qualifier(EXCHANGE_TOPICS_INFORM) Exchange exchange) {
-        return BindingBuilder.bind(queue).to(exchange).with(ROUTINGKEY_LAZY).noargs();
-
+    public Binding deadLetterBindingA(@Qualifier("deadLetterQueueA") Queue queue,
+                                      @Qualifier("deadLetterExchange") DirectExchange exchange){
+        return BindingBuilder.bind(queue).to(exchange).with(DLX_ROUTING_KEY_A);
     }
-
     /**********************************消费者消费失败后发送到队列*************************************************/
     @Bean
     public DirectExchange errorMessageExchange(){
-        return new DirectExchange("error.direct");
+        return new DirectExchange("yk.error.exchange");
     }
     @Bean
     public Queue errorQueue(){
-        return new Queue("error.queue", true);
+        return new Queue("yk.error.queue", true);
     }
     @Bean
     public Binding errorBinding(Queue errorQueue, DirectExchange errorMessageExchange){
-        return BindingBuilder.bind(errorQueue).to(errorMessageExchange).with("error");
+        return BindingBuilder.bind(errorQueue).to(errorMessageExchange).with("yk.error.key");
     }
 
     @Bean
     public MessageRecoverer republishMessageRecoverer(RabbitTemplate rabbitTemplate){
-        return new RepublishMessageRecoverer(rabbitTemplate, "error.direct", "error");
+        return new RepublishMessageRecoverer(rabbitTemplate, "yk.error.exchange", "yk.error.key");
     }
 
 }

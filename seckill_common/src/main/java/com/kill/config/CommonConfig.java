@@ -20,7 +20,6 @@ public class CommonConfig implements ApplicationContextAware {
         // 设置 ConfirmCallback
         template.setConfirmCallback((correlationData, ack, cause) -> {
             if (ack) {
-                System.out.println("消息到交换机发送成功");
             } else {
                 System.out.println("消息到交换机发送失败: " + cause);
             }
